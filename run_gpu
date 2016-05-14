@@ -3,6 +3,7 @@
 if [ -z "$1" ]
   then echo "Please provide the name of the game, e.g.  ./run_gpu breakout "; exit 0
 fi
+
 ENV=$1
 FRAMEWORK="alewrap"
 
