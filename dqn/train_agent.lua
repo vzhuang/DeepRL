@@ -74,6 +74,7 @@ local total_reward
 local nrewards
 local nepisodes
 local episode_reward = 0
+local lives = 5
 
 local screen, reward, terminal = game_env:getState()
 
@@ -90,8 +91,12 @@ while step < opt.steps do
 	screen, reward, terminal = game_env:step(game_actions[action_index], true)
 	episode_reward = episode_reward + reward
     else
-	io.write(episode_reward, "\n")
-	episode_reward = 0
+	lives = lives - 1
+	if lives == 0 then
+	    io.write(episode_reward, "\n")
+	    episode_reward = 0
+	    lives = 5
+	end
         if opt.random_starts > 0 then
             screen, reward, terminal = game_env:nextRandomGame()
         else
