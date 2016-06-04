@@ -134,7 +134,7 @@ function nql:__init(args)
     self.lastState = nil
     self.lastAction = nil
     self.v_avg = 0 -- V running average.
-    self.tderr_avg = 0 -- TD error running average.
+    self.tderr_avg = 0 -- TD error running average.	
 
     self.q_max = 1
     self.r_max = 1
@@ -331,7 +331,7 @@ function nql:perceive(reward, rawstate, terminal, testing, testing_ep)
 
     -- Select action
     local actionIndex = 1
-    if not terminal then
+    if not terminal then	
         actionIndex = self:eGreedy(curState, testing_ep)
     end
 

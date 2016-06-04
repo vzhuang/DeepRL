@@ -73,20 +73,25 @@ time_history[1] = 0
 local total_reward
 local nrewards
 local nepisodes
-local episode_reward
+local episode_reward = 0
 
 local screen, reward, terminal = game_env:getState()
 
 print("Iteration ..", step)
 local win = nil
+res = io.open("results.txt", "w")
+io.output(res)
 while step < opt.steps do
     step = step + 1
     local action_index = agent:perceive(reward, screen, terminal)
-
+    
     -- game over? get next game!
     if not terminal then
-        screen, reward, terminal = game_env:step(game_actions[action_index], true)
+	screen, reward, terminal = game_env:step(game_actions[action_index], true)
+	episode_reward = episode_reward + reward
     else
+	io.write(episode_reward, "\n")
+	episode_reward = 0
         if opt.random_starts > 0 then
             screen, reward, terminal = game_env:nextRandomGame()
         else
@@ -107,8 +112,7 @@ while step < opt.steps do
 
     if step%1000 == 0 then collectgarbage() end
 
-    if step % opt.eval_freq == 0 and step > learn_start then
-
+    if step % opt.eval_freq == 0 and step > learn_start then	
         screen, reward, terminal = game_env:newGame()
 
         total_reward = 0
