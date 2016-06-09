@@ -10,6 +10,12 @@ end
 
 local sql = torch.class('dqn.SpeedyQLearner')
 
+-- override print to always flush the output
+local old_print = print
+local print = function(...)
+    old_print(...)
+    io.flush()
+end
 
 function sql:__init(args)
     self.state_dim  = args.state_dim -- State dimensionality.
@@ -65,6 +71,7 @@ function sql:__init(args)
     self.network    = args.network or self:createNetwork()
     self.networkPrev = args.network or self:createNetwork()
     self.alpha = 1
+    self.delta = 1
 
     -- check whether there is a network file
     local network_function
@@ -173,6 +180,10 @@ function sql:set_alpha(alpha)
     self.alpha = alpha
 end
 
+function sql:get_delta()
+    return self.delta
+end
+
 function sql:preprocess(rawstate)
     if self.preproc then
         return self.preproc:forward(rawstate:float())
@@ -200,6 +211,7 @@ function sql:getQUpdate(args)
 
     -- delta = 
     term = term:clone():float():mul(-1):add(1)
+    self.alpha = self.lr
 
     local target_q_net
     if self.target_q then
@@ -209,8 +221,7 @@ function sql:getQUpdate(args)
     end
 
     -- Compute max_a Q_prev(s_2, a).
-    q2_prev_max = self.networkPrev:forward(s2):float():max(2)
-    
+    q2_prev_max = self.networkPrev:forward(s2):float():max(2)    
 
     -- Compute max_a Q(s_2, a).
     q2_max = target_q_net:forward(s2):float():max(2)
@@ -227,8 +238,10 @@ function sql:getQUpdate(args)
     if self.rescale_r then
         delta:div(self.r_max)
     end
+    q2:mul(1-self.alpha)
+    q2_prev:mul(2*self.alpha-1)
     delta:add(q2)
-    delta:add(2*self.alpha-1, q2_prev)
+    delta:add(q2_prev)
 
     -- q = Q(s,a)
     local q_all = self.network:forward(s):float()
@@ -262,7 +275,7 @@ function sql:qLearnMinibatch()
     local s, a, r, s2, term = self.transitions:sample(self.minibatch_size)
 
     local targets, delta, q2_max = self:getQUpdate{s=s, a=a, r=r, s2=s2,
-        term=term, update_qmax=true}
+						   term=term, update_qmax=true}
 
     -- zero gradients of parameters
     self.dw:zero()
@@ -354,7 +367,7 @@ function sql:perceive(reward, rawstate, terminal, testing, testing_ep)
 
     self.transitions:add_recent_action(actionIndex)
 
-    local tempnet = self.network
+    local tempnet = self.network:clone()
 
     --Do some Q-learning updates
     if self.numSteps > self.learn_start and not testing and

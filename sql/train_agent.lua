@@ -73,32 +73,32 @@ time_history[1] = 0
 local total_reward
 local nrewards
 local nepisodes
-local episode_reward = 0
-local lives = 5
+--local episode_reward = 0
+--local lives = 5
 local alpha = 1
 
 local screen, reward, terminal = game_env:getState()
 
 print("Iteration ..", step)
 local win = nil
-res = io.open("results.txt", "w")
-io.output(res)
+--res = io.open("results.txt", "wxsx")
+--io.output(res)
 while step < opt.steps do
     step = step + 1
-    agent:set_alpha(1 / step)
+    --agent:set_alpha(1/step)
     local action_index = agent:perceive(reward, screen, terminal)
-    
+    --print(agent:get_delta())
     -- game over? get next game!
     if not terminal then
 	screen, reward, terminal = game_env:step(game_actions[action_index], true)
-	episode_reward = episode_reward + reward
+	--episode_reward = episode_reward + reward
     else
-	lives = lives - 1
-	if lives == 0 then
-	    io.write(episode_reward, "\n")
-	    episode_reward = 0
-	    lives = 5
-	end
+	--lives = lives - 1
+	--if lives == 0 then
+	    --io.write(episode_reward, "\n")
+	    --episode_reward = 0
+	    --lives = 5
+	--end
         if opt.random_starts > 0 then
             screen, reward, terminal = game_env:nextRandomGame()
         else
