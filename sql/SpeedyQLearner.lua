@@ -93,8 +93,10 @@ function sql:__init(args)
 
     if self.gpu and self.gpu >= 0 then
         self.network:cuda()
+	self.networkPrev:cuda()
     else
         self.network:float()
+	self.networkPrev:float()
     end
 
     -- Load preprocessing network.
@@ -198,20 +200,21 @@ function sql:getQUpdate(args)
 
     -- delta = r + (1-terminal) * gamma * max_a Q(s2, a) - Q(s, a)
 
-    -- delta = 
-    term = term:clone():float():mul(-1):add(1)
+    term = term:clone():float():mul(-1):add(1)    
 
     local target_q_net
+    local target_prev_net
     if self.target_q then
-        target_q_net = self.target_network
+	target_q_net = self.target_network
+	target_prev_net = self.target_network
     else
         target_q_net = self.network
+	target_prev_net = self.network
     end
 
     -- Compute max_a Q_prev(s_2, a).
-    q2_prev_max = self.networkPrev:forward(s2):float():max(2)
+    q2_prev_max = target_prev_net:forward(s2):float():max(2)
     
-
     -- Compute max_a Q(s_2, a).
     q2_max = target_q_net:forward(s2):float():max(2)
 
@@ -290,7 +293,7 @@ function sql:qLearnMinibatch()
     self.tmp:sqrt()
 
     -- accumulate update
-    self.deltas:mul(0):addcdiv(self.lr, self.dw, self.tmp)
+    self.deltas:mul(0):addcdiv(self.lr / self.alpha, self.dw, self.tmp)
     self.w:add(self.deltas)
 end
 
