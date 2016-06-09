@@ -71,7 +71,6 @@ function sql:__init(args)
     self.network    = args.network or self:createNetwork()
     self.networkPrev = args.network or self:createNetwork()
     self.alpha = 1
-    self.delta = 1
 
     -- check whether there is a network file
     local network_function
@@ -89,13 +88,16 @@ function sql:__init(args)
         end
         if self.best and exp.best_model then
             self.network = exp.best_model
+	    self.networkPrev = exp.best_model
         else
             self.network = exp.model
+	    self.networkPrev = exp.model
         end
     else
         print('Creating Agent Network from ' .. self.network)
         self.network = err
         self.network = self:network()
+	self.networkPrev = self.network:clone()
     end
 
     if self.gpu and self.gpu >= 0 then
@@ -120,9 +122,11 @@ function sql:__init(args)
 
     if self.gpu and self.gpu >= 0 then
         self.network:cuda()
+	self.networkPrev:cuda()
         self.tensor_type = torch.CudaTensor
     else
         self.network:float()
+	self.networkPrev:float()
         self.tensor_type = torch.FloatTensor
     end
 
@@ -182,10 +186,6 @@ function sql:set_alpha(alpha)
     self.alpha = alpha
 end
 
-function sql:get_delta()
-    return self.delta
-end
-
 function sql:preprocess(rawstate)
     if self.preproc then
         return self.preproc:forward(rawstate:float())
@@ -221,15 +221,14 @@ function sql:getQUpdate(args)
 	target_prev_net = self.target_network
     else
         target_q_net = self.network
-	target_prev_net = self.network
-    end
+	target_prev_net = self.networkPrev
+    end    
+    
+    -- Compute max_a Q(s_2, a).
+    q2_max = target_q_net:forward(s2):float():max(2)
 
     -- Compute max_a Q_prev(s_2, a).
     q2_prev_max = target_prev_net:forward(s2):float():max(2)
-    
-
-    -- Compute max_a Q(s_2, a).
-    q2_max = target_q_net:forward(s2):float():max(2)
 
     -- Compute q2 = (1-terminal) * gamma * max_a Q(s2, a)
     q2 = q2_max:clone():mul(self.discount):cmul(term)
@@ -238,15 +237,10 @@ function sql:getQUpdate(args)
 
     delta = r:clone():float()
 
-    delta:mul(self.alpha)
-
     if self.rescale_r then
         delta:div(self.r_max)
     end
-    q2:mul(1-self.alpha)
-    q2_prev:mul(2*self.alpha-1)
     delta:add(q2)
-    delta:add(q2_prev)
 
     -- q = Q(s,a)
     local q_all = self.network:forward(s):float()
@@ -254,7 +248,11 @@ function sql:getQUpdate(args)
     for i=1,q_all:size(1) do
         q[i] = q_all[i][a[i]]
     end
-    delta:add(-self.alpha, q)    
+    delta:add(-1, q)
+
+    diff = q2:clone():add(-1, q2_prev)
+    delta:add((1-self.alpha)/self.alpha, diff)
+    
 
     if self.clip_delta then
         delta[delta:ge(self.clip_delta)] = self.clip_delta
@@ -308,7 +306,7 @@ function sql:qLearnMinibatch()
     self.tmp:sqrt()
 
     -- accumulate update
-    self.deltas:mul(0):addcdiv(self.lr / self.alpha, self.dw, self.tmp)
+    self.deltas:mul(0):addcdiv(self.lr, self.dw, self.tmp)
     self.w:add(self.deltas)
 end
 
