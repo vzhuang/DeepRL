@@ -5,7 +5,7 @@ See LICENSE file for full terms of limited license.
 ]]
 
 require "initenv"
-
+require "dp"
 function create_network(args)
 
     local net = nn.Sequential()
@@ -20,14 +20,32 @@ function create_network(args)
     net:add(args.nl())
 
     -- Add convolutional layers
+    local incepInputSize = args.n_units[1]
+    local tempInputDims = {1, args.input_dims[1], 
+    	  		   args.input_dims[2],
+			   args.input_dims[3]}
+    
     for i=1,(#args.n_units-1) do
-        -- second convolutional layer
+    	-- inception
+	net:add(nn.Inception{inputSize = incepInputSize,
+		outputSize = args.incepChannelSize[i],
+		reduceSize = args.incepReduceSize[i]
+        })
+	--	incepInputSize = args.incepSize[i]
+	incepInputSize = net:outside(tempInputDims)[2]
+
+
+
+	-- vanilla conv
+        --[[ second convolutional layer
         net:add(convLayer(args.n_units[i], args.n_units[i+1],
                             args.filter_size[i+1], args.filter_size[i+1],
                             args.filter_stride[i+1], args.filter_stride[i+1]))
         net:add(args.nl())
+	]]
     end
-
+    
+    
     local nel
     if args.gpu >= 0 then
         nel = net:cuda():forward(torch.zeros(1,unpack(args.input_dims))
@@ -35,7 +53,7 @@ function create_network(args)
     else
         nel = net:forward(torch.zeros(1,unpack(args.input_dims))):nElement()
     end
-
+    
     -- reshape all feature planes into a vector per example
     net:add(nn.Reshape(nel))
 
